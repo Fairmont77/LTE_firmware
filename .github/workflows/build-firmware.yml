@@ -9,18 +9,20 @@ on:
 
 jobs:
   build:
+    name: 🔧 Build OpenIPC Firmware with Masina
     runs-on: ubuntu-20.04
+    timeout-minutes: 120
     
     steps:
-    - name: Checkout repository
+    - name: 📥 Checkout repository
       uses: actions/checkout@v4
       
-    - name: Update system packages
+    - name: 🔄 Update system packages
       run: |
         sudo apt update
         sudo apt upgrade -y
         
-    - name: Install build dependencies
+    - name: 📦 Install build dependencies
       run: |
         sudo apt install -y \
           g++-arm-linux-gnueabihf \
@@ -49,40 +51,78 @@ jobs:
           tk-dev \
           libffi-dev
           
-    - name: Clone OpenIPC firmware repository
+    - name: 📂 Clone OpenIPC firmware repository
       run: |
+        echo "🔄 Cloning OpenIPC firmware repository..."
         git clone https://github.com/OpenIPC/firmware.git
+        echo "✅ OpenIPC firmware cloned successfully"
         
-    - name: Clone QuadroFleet-Masina project
+    - name: 📂 Clone QuadroFleet-Masina project
       run: |
+        echo "🔄 Cloning QuadroFleet-Masina project (opt branch)..."
         git clone -b opt https://github.com/beep-systems/quadrofleet-masina.git
+        echo "✅ QuadroFleet-Masina cloned successfully"
         
-    - name: Build Masina client
+    - name: 🔍 Verify cloned repositories
       run: |
+        echo "📋 Verifying cloned repositories structure:"
+        echo "OpenIPC firmware directory:"
+        ls -la firmware/ | head -10
+        echo ""
+        echo "QuadroFleet-Masina directory:"
+        ls -la quadrofleet-masina/ | head -10
+        echo ""
+        echo "Masina client directory:"
+        ls -la quadrofleet-masina/client/ | head -10
+        
+    - name: 🔨 Build Masina client
+      run: |
+        echo "🔄 Building Masina client..."
         cd quadrofleet-masina/client
+        echo "📋 Current directory contents:"
+        ls -la
+        echo ""
+        echo "🧹 Cleaning previous builds..."
         make clean
+        echo "🔨 Starting build process..."
         make
+        echo "✅ Masina client built successfully"
+        echo ""
+        echo "📋 Drop directory contents:"
+        ls -la drop/ || echo "⚠️ Drop directory not found"
         
-    - name: Copy Masina client files to firmware directory
+    - name: 📋 Copy Masina client files to firmware directory
       run: |
-        cp -r quadrofleet-masina/client/drop/* firmware/
+        echo "📋 Copying Masina client files to firmware directory..."
+        echo "📂 Files in quadrofleet-masina/client/drop/:"
+        ls -la quadrofleet-masina/client/drop/ || echo "⚠️ Drop directory is empty or doesn't exist"
+        echo ""
+        echo "🔄 Copying files..."
+        cp -r quadrofleet-masina/client/drop/* firmware/ || echo "⚠️ No files to copy or copy failed"
+        echo "✅ Files copied successfully"
         
-    - name: List firmware directory contents
+    - name: 📝 List firmware directory contents
       run: |
         echo "Firmware directory contents after copying Masina files:"
         ls -la firmware/
         
-    - name: Build OpenIPC firmware
+    - name: 🚀 Build OpenIPC firmware
       run: |
+        echo "🚀 Starting OpenIPC firmware build process..."
         cd firmware
+        echo "📋 Firmware directory contents before build:"
+        ls -la | head -20
+        echo ""
+        echo "🔨 Starting make process..."
         make
+        echo "✅ Firmware build completed successfully!"
         
-    - name: List build artifacts
+    - name: 📋 List build artifacts
       run: |
         echo "Build artifacts:"
         find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" | head -20
         
-    - name: Upload firmware artifacts
+    - name: 📤 Upload firmware artifacts
       uses: actions/upload-artifact@v4
       with:
         name: openipc-firmware-masina
@@ -92,7 +132,7 @@ jobs:
           firmware/**/*.fw
         retention-days: 30
         
-    - name: Create release on tag
+    - name: 🎯 Create release on tag
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
       with:
