@@ -1,0 +1,106 @@
+name: Build OpenIPC Firmware with Masina
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Update system packages
+      run: |
+        sudo apt update
+        sudo apt upgrade -y
+        
+    - name: Install build dependencies
+      run: |
+        sudo apt install -y \
+          g++-arm-linux-gnueabihf \
+          build-essential \
+          git \
+          wget \
+          curl \
+          unzip \
+          make \
+          cmake \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config \
+          libssl-dev \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libreadline-dev \
+          libsqlite3-dev \
+          libgdbm-dev \
+          libdb5.3-dev \
+          libbz2-dev \
+          libexpat1-dev \
+          liblzma-dev \
+          tk-dev \
+          libffi-dev
+          
+    - name: Clone OpenIPC firmware repository
+      run: |
+        git clone https://github.com/OpenIPC/firmware.git
+        
+    - name: Clone QuadroFleet-Masina project
+      run: |
+        git clone -b opt https://github.com/beep-systems/quadrofleet-masina.git
+        
+    - name: Build Masina client
+      run: |
+        cd quadrofleet-masina/client
+        make clean
+        make
+        
+    - name: Copy Masina client files to firmware directory
+      run: |
+        cp -r quadrofleet-masina/client/drop/* firmware/
+        
+    - name: List firmware directory contents
+      run: |
+        echo "Firmware directory contents after copying Masina files:"
+        ls -la firmware/
+        
+    - name: Build OpenIPC firmware
+      run: |
+        cd firmware
+        make
+        
+    - name: List build artifacts
+      run: |
+        echo "Build artifacts:"
+        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" | head -20
+        
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: openipc-firmware-masina
+        path: |
+          firmware/**/*.bin
+          firmware/**/*.img
+          firmware/**/*.fw
+        retention-days: 30
+        
+    - name: Create release on tag
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          firmware/**/*.bin
+          firmware/**/*.img
+          firmware/**/*.fw
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

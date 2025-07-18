@@ -1,0 +1,33 @@
+# Build artifacts
+*.o
+*.a
+*.so
+*.bin
+*.img
+*.fw
+*.elf
+
+# Directories created during build
+firmware/
+quadrofleet-masina/
+build/
+output/
+tmp/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
