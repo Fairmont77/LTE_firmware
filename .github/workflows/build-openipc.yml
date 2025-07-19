@@ -1,0 +1,82 @@
+name: Build OpenIPC Firmware
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        target: [SSC30KQ_4G, SSC3380_4G]
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++-arm-linux-gnueabihf build-essential git
+    
+    - name: Clone OpenIPC firmware repository
+      run: |
+        git clone https://github.com/OpenIPC/firmware.git
+    
+    - name: Clone QuadroFleet-Masina project
+      run: |
+        git clone -b opt https://github.com/beep-systems/quadrofleet-masina.git
+    
+    - name: Build Masina client
+      run: |
+        cd quadrofleet-masina/client
+        make clean
+        make
+    
+    - name: Copy Masina client files to firmware directory
+      run: |
+        cd ..
+        cp -r quadrofleet-masina/client/drop/* firmware/
+    
+    - name: Build firmware
+      run: |
+        cd firmware
+        make clean
+        make BOARD=${{ matrix.target }}
+    
+    - name: Find and rename output files
+      run: |
+        cd firmware/output/images
+        # Знайти файли прошивки
+        if [ -f "rootfs.squashfs.${{ matrix.target }}" ]; then
+          mv rootfs.squashfs.${{ matrix.target }} rootfs-${{ matrix.target }}-${{ github.sha }}.squashfs
+        fi
+        if [ -f "uImage.${{ matrix.target }}" ]; then
+          mv uImage.${{ matrix.target }} uImage-${{ matrix.target }}-${{ github.sha }}
+        fi
+        # Показати які файли є в директорії
+        ls -la
+    
+    - name: Upload firmware artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: openipc-firmware-${{ matrix.target }}-${{ github.sha }}
+        path: |
+          firmware/output/images/rootfs-*.squashfs
+          firmware/output/images/uImage-*
+        retention-days: 30
+    
+    - name: Create Release (optional - only on tags)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          firmware/output/images/rootfs-*.squashfs
+          firmware/output/images/uImage-*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
