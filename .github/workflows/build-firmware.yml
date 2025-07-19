@@ -23,8 +23,6 @@ jobs:
         
     - name: Install build dependencies
       run: |
-    - name: Install build dependencies
-      run: |
         sudo apt install -y \
           g++-arm-linux-gnueabihf \
           build-essential \
@@ -53,39 +51,62 @@ jobs:
     - name: Build firmware
       run: |
         cd firmware
-        echo "🚀 Starting firmware build..."
-        make || true
-        echo "✅ Build process completed"
+        echo "🚀 Starting firmware build for specific platform..."
+        echo "Available platforms:"
+        ls -la configs/ | head -10
         echo ""
-        echo "📊 Build directory size analysis:"
-        echo "Total firmware/ directory: $(du -sh . | cut -f1)"
-        echo "Source files: $(find . -name "*.c" -o -name "*.h" | wc -l) files"
-        echo "Object files: $(find . -name "*.o" | wc -l) files"
-        echo "Archive files: $(find . -name "*.a" | wc -l) files"
+        # Будуємо для конкретної платформи (наприклад SSC30KQ)
+        make PLATFORM=ssc30kq || make || true
+        echo "✅ Build process completed"
         
     - name: List build results
       run: |
-        echo "=== FIRMWARE FILES ==="
-        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" -o -name "*.rom" | while read file; do
-          echo "📦 $file ($(du -h "$file" | cut -f1))"
+        echo "=== ALL FIRMWARE FILES ==="
+        find firmware/ -name "*.squashfs*" -o -name "*mage*" -o -name "*.bin" -o -name "*.img" | head -20
+        echo ""
+        echo "=== LOOKING FOR SPECIFIC FILES ==="
+        find firmware/ -name "*ssc30kq*" | while read file; do
+          echo "🎯 $file ($(du -h "$file" | cut -f1))"
         done
         echo ""
-        echo "=== TOTAL FIRMWARE SIZE ==="
-        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" -o -name "*.rom" -exec du -ch {} + | tail -1
+        echo "=== ROOTFS AND UIMAGE FILES ==="
+        find firmware/ \( -name "rootfs.squashfs*" -o -name "uImage*" -o -name "*mage*" \) | while read file; do
+          echo "📦 $file ($(du -h "$file" | cut -f1))"
+        done
         
     - name: Prepare firmware package
       run: |
         mkdir -p firmware-package
-        echo "📦 Copying only firmware files..."
-        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" -o -name "*.rom" | while read file; do
+        echo "📦 Looking for specific firmware files..."
+        
+        # Шукаємо файли для конкретної платформи
+        find firmware/ -name "*ssc30kq*" | while read file; do
           cp "$file" firmware-package/ && echo "✅ Copied: $(basename "$file")"
         done
+        
+        # Якщо не знайшли ssc30kq, шукаємо загальні файли
+        if [ ! "$(ls -A firmware-package/)" ]; then
+          echo "⚠️ No ssc30kq files found, looking for generic files..."
+          find firmware/ \( -name "rootfs.squashfs*" -o -name "*Image*" -o -name "*mage*" \) | head -10 | while read file; do
+            cp "$file" firmware-package/ && echo "✅ Copied: $(basename "$file")"
+          done
+        fi
+        
+        # Створюємо md5sum файли якщо їх немає
+        cd firmware-package
+        for file in *.squashfs* *Image* *mage* 2>/dev/null; do
+          if [ -f "$file" ] && [ ! -f "$file.md5sum" ]; then
+            md5sum "$file" > "$file.md5sum"
+            echo "✅ Created: $file.md5sum"
+          fi
+        done
+        
         echo ""
         echo "📋 Final firmware package contents:"
-        ls -lah firmware-package/
+        ls -lah
         echo ""
         echo "📏 Total package size:"
-        du -sh firmware-package/
+        du -sh .
         
     - name: Upload artifacts
       if: always()
