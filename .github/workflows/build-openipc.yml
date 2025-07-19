@@ -31,17 +31,56 @@ jobs:
     - name: Clone QuadroFleet-Masina project
       run: |
         git clone -b opt https://github.com/beep-systems/quadrofleet-masina.git
+        
+    - name: Investigate project structure
+      run: |
+        echo "=== QuadroFleet-Masina structure ==="
+        ls -la quadrofleet-masina/
+        echo "=== Client directory ==="
+        ls -la quadrofleet-masina/client/
+        echo "=== Checking Makefile ==="
+        head -20 quadrofleet-masina/client/Makefile || echo "Makefile not found"
     
     - name: Build Masina client
       run: |
         cd quadrofleet-masina/client
         make clean
         make
+        # Показати що створилося після збірки
+        ls -la
+        find . -type f -name "*" | head -20
     
     - name: Copy Masina client files to firmware directory
       run: |
-        cd ..
-        cp -r quadrofleet-masina/client/drop/* firmware/
+        # Перевірити структуру директорій
+        echo "=== Checking quadrofleet-masina/client directory ==="
+        ls -la quadrofleet-masina/client/
+        echo "=== Checking for drop directory ==="
+        ls -la quadrofleet-masina/client/drop/ || echo "Drop directory not found"
+        
+        # Спробувати знайти потрібні файли
+        echo "=== Finding built files ==="
+        find quadrofleet-masina/client -type f -name "*.so" -o -name "*.a" -o -name "masina*" | head -20
+        
+        # Копіювати файли (якщо drop існує)
+        if [ -d "quadrofleet-masina/client/drop" ]; then
+          cp -r quadrofleet-masina/client/drop/* firmware/
+        elif [ -d "quadrofleet-masina/drop" ]; then
+          # Можливо drop на рівень вище
+          cp -r quadrofleet-masina/drop/* firmware/
+        else
+          echo "WARNING: drop directory not found, looking for built binaries..."
+          # Пошук бінарних файлів masina
+          find quadrofleet-masina -name "masina" -type f -executable | while read file; do
+            echo "Found: $file"
+            cp "$file" firmware/ || true
+          done
+          # Пошук shared libraries
+          find quadrofleet-masina -name "*.so" -type f | while read file; do
+            echo "Found library: $file"
+            cp "$file" firmware/ || true
+          done
+        fi
     
     - name: Build firmware
       run: |
