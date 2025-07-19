@@ -79,23 +79,23 @@ jobs:
         mkdir -p firmware-package
         echo "📦 Looking for specific firmware files..."
         
-        # Шукаємо файли для конкретної платформи
-        find firmware/ -name "*ssc30kq*" | while read file; do
+        # Шукаємо файли для конкретної платформи (тільки бінарні файли, не конфіги)
+        find firmware/ -name "*ssc30kq*" -type f \( -name "*.squashfs*" -o -name "*Image*" -o -name "*mage*" -o -name "*.bin" -o -name "*.img" \) | while read file; do
           cp "$file" firmware-package/ && echo "✅ Copied: $(basename "$file")"
         done
         
-        # Якщо не знайшли ssc30kq, шукаємо загальні файли
+        # Якщо не знайшли ssc30kq бінарні файли, шукаємо загальні файли
         if [ ! "$(ls -A firmware-package/)" ]; then
-          echo "⚠️ No ssc30kq files found, looking for generic files..."
-          find firmware/ \( -name "rootfs.squashfs*" -o -name "*Image*" -o -name "*mage*" \) | head -10 | while read file; do
+          echo "⚠️ No ssc30kq binary files found, looking for generic files..."
+          find firmware/ -type f \( -name "rootfs.squashfs*" -o -name "*Image*" -o -name "*mage*" -o -name "*.bin" -o -name "*.img" \) | head -10 | while read file; do
             cp "$file" firmware-package/ && echo "✅ Copied: $(basename "$file")"
           done
         fi
         
         # Створюємо md5sum файли якщо їх немає
         cd firmware-package
-        for file in *.squashfs* *Image* *mage* 2>/dev/null; do
-          if [ -f "$file" ] && [ ! -f "$file.md5sum" ]; then
+        for file in *; do
+          if [ -f "$file" ] && [[ "$file" == *.squashfs* || "$file" == *Image* || "$file" == *mage* ]] && [ ! -f "$file.md5sum" ]; then
             md5sum "$file" > "$file.md5sum"
             echo "✅ Created: $file.md5sum"
           fi
