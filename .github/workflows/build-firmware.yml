@@ -53,15 +53,44 @@ jobs:
     - name: Build firmware
       run: |
         cd firmware
+        echo "🚀 Starting firmware build..."
         make || true
+        echo "✅ Build process completed"
+        echo ""
+        echo "📊 Build directory size analysis:"
+        echo "Total firmware/ directory: $(du -sh . | cut -f1)"
+        echo "Source files: $(find . -name "*.c" -o -name "*.h" | wc -l) files"
+        echo "Object files: $(find . -name "*.o" | wc -l) files"
+        echo "Archive files: $(find . -name "*.a" | wc -l) files"
         
     - name: List build results
-      run: find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" || true
+      run: |
+        echo "=== FIRMWARE FILES ==="
+        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" -o -name "*.rom" | while read file; do
+          echo "📦 $file ($(du -h "$file" | cut -f1))"
+        done
+        echo ""
+        echo "=== TOTAL FIRMWARE SIZE ==="
+        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" -o -name "*.rom" -exec du -ch {} + | tail -1
+        
+    - name: Prepare firmware package
+      run: |
+        mkdir -p firmware-package
+        echo "📦 Copying only firmware files..."
+        find firmware/ -name "*.bin" -o -name "*.img" -o -name "*.fw" -o -name "*.rom" | while read file; do
+          cp "$file" firmware-package/ && echo "✅ Copied: $(basename "$file")"
+        done
+        echo ""
+        echo "📋 Final firmware package contents:"
+        ls -lah firmware-package/
+        echo ""
+        echo "📏 Total package size:"
+        du -sh firmware-package/
         
     - name: Upload artifacts
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: firmware-build
-        path: firmware/
-        retention-days: 7
+        name: openipc-firmware-final
+        path: firmware-package/
+        retention-days: 14
